@@ -9,7 +9,7 @@ interface Contact {
   username?: string; // Make this compatible with the profile data
   avatar?: string;
   avatar_url?: string; // Make this compatible with the profile data
-  status: string;
+  status: string; // Accept any string status from the backend
   lastMessage?: {
     content: string;
     timestamp: Date;
@@ -133,7 +133,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="relative">
               <UserAvatar 
                 name={contact.name} 
-                image={contact.avatar} 
+                image={contact.avatar || contact.avatar_url} 
                 status={contact.status}
                 size={isCollapsed ? 'md' : 'sm'}
               />
