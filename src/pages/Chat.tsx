@@ -8,7 +8,10 @@ import { ProfileService, type Profile } from '@/services/ProfileService';
 import { Loader2, LogOut, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+// Update the Contact interface to match what Sidebar expects
 interface Contact extends Profile {
+  name: string; // Add this to satisfy Sidebar's expectations
+  avatar?: string;
   lastMessage?: {
     content: string;
     timestamp: Date;
@@ -35,6 +38,8 @@ const Chat = () => {
           .filter(profile => profile.id !== user.id)
           .map(profile => ({
             ...profile,
+            name: profile.username || 'Unknown', // Map username to name for Sidebar
+            avatar: profile.avatar_url, // Map avatar_url to avatar for Sidebar
             lastMessage: {
               content: "Click to start chatting",
               timestamp: new Date(),
@@ -62,7 +67,12 @@ const Chat = () => {
       setContacts(prevContacts => 
         prevContacts.map(contact => 
           contact.id === updatedProfile.id 
-            ? { ...contact, ...updatedProfile } 
+            ? { 
+                ...contact, 
+                ...updatedProfile,
+                name: updatedProfile.username || 'Unknown', // Ensure name is always set
+                avatar: updatedProfile.avatar_url // Ensure avatar is mapped correctly
+              } 
             : contact
         )
       );

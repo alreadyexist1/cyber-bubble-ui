@@ -59,11 +59,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Setup beforeunload event to update status to offline when tab/browser closes
     const handleBeforeUnload = () => {
       if (session?.user) {
-        // Use a synchronous request to ensure it completes before page unload
+        // Use a direct API call instead of accessing protected properties
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://vfdjzxpxnjvcamhbpiwu.supabase.co'}/rest/v1/profiles?id=eq.${session.user.id}`;
+        const apiKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmZGp6eHB4bmp2Y2FtaGJwaXd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI3MjY2MjksImV4cCI6MjA1ODMwMjYyOX0.0TwZbJBBHe5t8zwa5Dok37t0VHpssEty6NPJOiNkF7c';
+        
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${supabase.supabaseUrl}/rest/v1/profiles?id=eq.${session.user.id}`, false);
+        xhr.open('POST', apiUrl, false);
         xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('apikey', supabase.supabaseKey);
+        xhr.setRequestHeader('apikey', apiKey);
         xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
         xhr.send(JSON.stringify({ status: 'offline', last_online: new Date().toISOString() }));
       }

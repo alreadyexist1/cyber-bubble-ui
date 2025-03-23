@@ -6,8 +6,10 @@ import UserAvatar from './UserAvatar';
 interface Contact {
   id: string;
   name: string;
+  username?: string; // Make this compatible with the profile data
   avatar?: string;
-  status: 'online' | 'offline' | 'away' | 'busy';
+  avatar_url?: string; // Make this compatible with the profile data
+  status: string;
   lastMessage?: {
     content: string;
     timestamp: Date;
