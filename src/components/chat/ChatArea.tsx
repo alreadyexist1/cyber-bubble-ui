@@ -2,92 +2,87 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Phone, Video, Info, MoreVertical } from 'lucide-react';
 import UserAvatar from './UserAvatar';
-import MessageBubble, { Message } from './MessageBubble';
+import MessageBubble, { Message as MessageType } from './MessageBubble';
 import MessageInput from './MessageInput';
-
-interface Contact {
-  id: string;
-  name: string;
-  avatar?: string;
-  status: 'online' | 'offline' | 'away' | 'busy';
-}
+import { useAuth } from '@/hooks/useAuth';
+import { MessageService } from '@/services/MessageService';
+import { Profile } from '@/services/ProfileService';
 
 interface ChatAreaProps {
-  contact: Contact;
+  contact: Profile;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ contact }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<MessageType[]>([]);
+  const [replyTo, setReplyTo] = useState<MessageType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // Generate initial mock messages
   useEffect(() => {
-    const mockMessages: Message[] = [
-      {
-        id: '1',
-        content: 'Hey there! How are you doing today?',
-        sender: {
-          id: contact.id,
-          name: contact.name,
-          avatar: contact.avatar,
-        },
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        isRead: true,
-        isCurrentUser: false,
-      },
-      {
-        id: '2',
-        content: "I'm doing great! Just finished working on that new project. How about you?",
-        sender: {
-          id: 'current-user',
-          name: 'You',
-          avatar: undefined,
-        },
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1.9), // 1.9 hours ago
-        isRead: true,
-        isCurrentUser: true,
-      },
-      {
-        id: '3',
-        content: "That's awesome! I've been meaning to ask you about that project. Could you share some details when you have time?",
-        sender: {
-          id: contact.id,
-          name: contact.name,
-          avatar: contact.avatar,
-        },
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1.8), // 1.8 hours ago
-        isRead: true,
-        isCurrentUser: false,
-      },
-      {
-        id: '4',
-        content: "Of course! It's a React application with some really cool animations. I'm using Framer Motion for transitions and Tailwind CSS for styling.",
-        sender: {
-          id: 'current-user',
-          name: 'You',
-          avatar: undefined,
-        },
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1.7), // 1.7 hours ago
-        isRead: true,
-        isCurrentUser: true,
-      },
-      {
-        id: '5',
-        content: "That sounds really interesting! I've been wanting to learn more about Framer Motion. Would you be willing to show me some examples?",
-        sender: {
-          id: contact.id,
-          name: contact.name,
-          avatar: contact.avatar,
-        },
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 1.6), // 1.6 hours ago
-        isRead: true,
-        isCurrentUser: false,
-      },
-    ];
+    const fetchMessages = async () => {
+      if (!user || !contact) return;
+      
+      setIsLoading(true);
+      try {
+        const conversation = await MessageService.getConversation(user.id, contact.id);
+        
+        // Transform to the format expected by MessageBubble
+        const formattedMessages = conversation.map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          sender: {
+            id: msg.sender_id,
+            name: msg.sender_id === user.id ? 'You' : contact.username,
+            avatar: msg.sender_id === user.id ? undefined : contact.avatar_url,
+          },
+          timestamp: new Date(msg.created_at),
+          isRead: msg.is_read,
+          isCurrentUser: msg.sender_id === user.id,
+        }));
+        
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
-    setMessages(mockMessages);
-  }, [contact]);
+    fetchMessages();
+    
+    // Subscribe to new messages
+    const subscription = MessageService.subscribeToMessages((newMsg) => {
+      if (
+        (newMsg.sender_id === user?.id && newMsg.receiver_id === contact.id) || 
+        (newMsg.sender_id === contact.id && newMsg.receiver_id === user?.id)
+      ) {
+        const formattedMsg: MessageType = {
+          id: newMsg.id,
+          content: newMsg.content,
+          sender: {
+            id: newMsg.sender_id,
+            name: newMsg.sender_id === user?.id ? 'You' : contact.username,
+            avatar: newMsg.sender_id === user?.id ? undefined : contact.avatar_url,
+          },
+          timestamp: new Date(newMsg.created_at),
+          isRead: newMsg.is_read,
+          isCurrentUser: newMsg.sender_id === user?.id,
+        };
+        
+        setMessages(prev => [...prev, formattedMsg]);
+        
+        // Mark message as read if it's not from current user
+        if (newMsg.sender_id !== user?.id) {
+          MessageService.markAsRead(newMsg.id);
+        }
+      }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user, contact]);
   
   useEffect(() => {
     scrollToBottom();
@@ -97,64 +92,40 @@ const ChatArea: React.FC<ChatAreaProps> = ({ contact }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
-  const handleSendMessage = (content: string) => {
-    if (!content.trim()) return;
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim() || !user) return;
     
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      content,
-      sender: {
-        id: 'current-user',
-        name: 'You',
-      },
-      timestamp: new Date(),
-      isRead: false,
-      isCurrentUser: true,
-      replyTo: replyTo || undefined,
-    };
-    
-    setMessages([...messages, newMessage]);
-    setReplyTo(null);
-    
-    // Simulate response after a delay
-    if (messages.length < 10) {
-      setTimeout(() => {
-        const response: Message = {
-          id: (Date.now() + 1).toString(),
-          content: getRandomResponse(),
-          sender: {
-            id: contact.id,
-            name: contact.name,
-            avatar: contact.avatar,
-          },
-          timestamp: new Date(),
-          isCurrentUser: false,
-        };
-        
-        setMessages(prev => [...prev, response]);
-      }, 2000 + Math.random() * 3000);
+    try {
+      await MessageService.sendMessage(
+        user.id,
+        contact.id,
+        content
+      );
+      
+      // The message will be added through the subscription
+      setReplyTo(null);
+    } catch (error) {
+      console.error('Error sending message:', error);
     }
   };
   
-  const handleReply = (message: Message) => {
+  const handleReply = (message: MessageType) => {
     setReplyTo(message);
   };
   
-  const getRandomResponse = (): string => {
-    const responses = [
-      "That's interesting! Tell me more.",
-      "I see what you mean. How do you think we should proceed?",
-      "Great point! I hadn't considered that perspective.",
-      "Thanks for sharing that with me!",
-      "I completely agree with your assessment.",
-      "I have some thoughts on that. Let's discuss it further.",
-      "That's a clever approach to the problem.",
-      "I appreciate your insight on this matter.",
-      "Let me think about that for a bit.",
-      "You've given me something to consider!",
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'Online';
+      case 'offline':
+        return 'Offline';
+      case 'away':
+        return 'Away';
+      case 'busy':
+        return 'Busy';
+      default:
+        return 'Offline';
+    }
   };
   
   return (
@@ -163,15 +134,15 @@ const ChatArea: React.FC<ChatAreaProps> = ({ contact }) => {
       <div className="flex items-center justify-between p-4 border-b border-white/10">
         <div className="flex items-center gap-3">
           <UserAvatar 
-            name={contact.name} 
-            image={contact.avatar} 
-            status={contact.status}
+            name={contact.username} 
+            image={contact.avatar_url} 
+            status={contact.status as any}
           />
           
           <div>
-            <h2 className="font-medium">{contact.name}</h2>
+            <h2 className="font-medium">{contact.username}</h2>
             <p className="text-xs text-foreground/70">
-              {contact.status === 'online' ? 'Online' : 'Offline'}
+              {getStatusText(contact.status)}
             </p>
           </div>
         </div>
@@ -194,13 +165,26 @@ const ChatArea: React.FC<ChatAreaProps> = ({ contact }) => {
       
       {/* Messages area */}
       <div className="flex-1 overflow-y-auto p-4 scrollbar-thin">
-        {messages.map((message) => (
-          <MessageBubble 
-            key={message.id} 
-            message={message} 
-            onReply={handleReply}
-          />
-        ))}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <p className="text-lg text-foreground/60 mb-2">No messages yet</p>
+            <p className="text-sm text-foreground/40">
+              Send a message to start the conversation
+            </p>
+          </div>
+        ) : (
+          messages.map((message) => (
+            <MessageBubble 
+              key={message.id} 
+              message={message} 
+              onReply={handleReply}
+            />
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
       
