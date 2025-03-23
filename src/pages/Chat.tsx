@@ -44,7 +44,7 @@ const mockContacts = [
     name: 'Ethan Johnson',
     status: 'away' as const,
     lastMessage: {
-      content: 'I'll be there in 10 minutes.',
+      content: "I'll be there in 10 minutes.",
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5), // 5 hours ago
       isRead: true,
     },
@@ -76,7 +76,7 @@ const mockContacts = [
     status: 'offline' as const,
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=256&q=80',
     lastMessage: {
-      content: 'Let me know when you're free to talk.',
+      content: "Let me know when you're free to talk.",
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48), // 2 days ago
       isRead: true,
     },
